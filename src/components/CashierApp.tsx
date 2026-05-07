@@ -5,6 +5,7 @@ import Icon from "@/components/ui/icon";
 import CashierScanner from "@/components/CashierScanner";
 import AdminPanel from "@/components/AdminPanel";
 import OrdersPanel from "@/components/OrdersPanel";
+import ConnectCode from "@/components/ConnectCode";
 
 interface Props {
   user: User;
@@ -12,7 +13,7 @@ interface Props {
   onUserUpdate: (u: User) => void;
 }
 
-type Tab = "orders" | "scanner" | "admin";
+type Tab = "orders" | "scanner" | "connect" | "admin";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending: { label: "Ожидает", color: "text-yellow-400" },
@@ -26,6 +27,7 @@ export { STATUS_LABELS };
 
 export default function CashierApp({ user, onLogout, onUserUpdate }: Props) {
   const [tab, setTab] = useState<Tab>("orders");
+  const token = localStorage.getItem("pos_token") || "";
   const [newOrdersCount, setNewOrdersCount] = useState(0);
 
   const refreshCount = useCallback(async () => {
@@ -41,10 +43,11 @@ export default function CashierApp({ user, onLogout, onUserUpdate }: Props) {
     return () => clearInterval(interval);
   }, [refreshCount]);
 
-  const tabs: { id: Tab; label: string; icon: string; adminOnly?: boolean }[] = [
+  const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: "orders", label: "Заказы", icon: "ClipboardList" },
     { id: "scanner", label: "Сканер", icon: "ScanBarcode" },
-    ...(user.role === "admin" ? [{ id: "admin" as Tab, label: "Админ", icon: "Settings", adminOnly: true }] : []),
+    { id: "connect", label: "Код", icon: "Link" },
+    ...(user.role === "admin" ? [{ id: "admin" as Tab, label: "Админ", icon: "Settings" }] : []),
   ];
 
   return (
@@ -96,9 +99,10 @@ export default function CashierApp({ user, onLogout, onUserUpdate }: Props) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden overflow-y-auto scrollbar-thin">
           {tab === "orders" && <OrdersPanel onCountChange={setNewOrdersCount} />}
           {tab === "scanner" && <CashierScanner />}
+          {tab === "connect" && <ConnectCode user={user} token={token} />}
           {tab === "admin" && user.role === "admin" && <AdminPanel onUserUpdate={onUserUpdate} />}
         </div>
       </div>

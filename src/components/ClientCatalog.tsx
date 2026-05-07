@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { User } from "@/pages/Index";
 import Icon from "@/components/ui/icon";
+import CameraScanner from "@/components/CameraScanner";
 
 interface Product {
   id: number;
@@ -30,6 +31,8 @@ export default function ClientCatalog({ user, onUserUpdate }: Props) {
   const [category, setCategory] = useState("all");
   const [loading, setLoading] = useState(true);
   const [showCart, setShowCart] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannedProduct, setScannedProduct] = useState<Product | null>(null);
   const [ordering, setOrdering] = useState(false);
   const [orderMsg, setOrderMsg] = useState("");
 
@@ -55,6 +58,16 @@ export default function ClientCatalog({ user, onUserUpdate }: Props) {
       if (ex) return prev.map((i) => i.id === p.id ? { ...i, quantity: i.quantity + 1 } : i);
       return [...prev, { ...p, quantity: 1 }];
     });
+  };
+
+  const handleBarcodeScan = async (barcode: string) => {
+    setShowScanner(false);
+    try {
+      const product = await api.products.byBarcode(barcode);
+      setScannedProduct(product);
+    } catch (_e) {
+      setOrderMsg(`❌ Товар с кодом "${barcode}" не найден`);
+    }
   };
 
   const removeFromCart = (id: number) => setCart((prev) => prev.filter((i) => i.id !== id));
@@ -90,6 +103,48 @@ export default function ClientCatalog({ user, onUserUpdate }: Props) {
 
   return (
     <div className="h-full flex flex-col">
+      {showScanner && (
+        <CameraScanner
+          onScan={handleBarcodeScan}
+          onClose={() => setShowScanner(false)}
+          hint="Наведите камеру на штрихкод товара"
+        />
+      )}
+
+      {scannedProduct && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end px-4 pb-6" onClick={() => setScannedProduct(null)}>
+          <div className="w-full max-w-lg mx-auto bg-card rounded-2xl border border-border p-5 animate-slide-up" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 rounded-xl bg-accent/10 flex items-center justify-center flex-shrink-0">
+                <Icon name="ScanLine" size={28} className="text-accent" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-accent font-medium mb-1 uppercase tracking-wide">Отсканирован</p>
+                <p className="font-display text-xl font-bold text-foreground">{scannedProduct.name}</p>
+                {scannedProduct.discount_percent > 0 && (
+                  <p className="text-xs text-muted-foreground line-through">{scannedProduct.price.toFixed(0)} ₽</p>
+                )}
+                <p className="text-2xl font-display font-bold text-primary mt-0.5">
+                  {getPrice(scannedProduct).toFixed(0)} ₽
+                  {scannedProduct.discount_percent > 0 && <span className="text-sm text-accent ml-2">−{scannedProduct.discount_percent}%</span>}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setScannedProduct(null)} className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground text-sm font-medium hover:bg-secondary/50 transition-colors">
+                Закрыть
+              </button>
+              <button
+                onClick={() => { addToCart(scannedProduct); setScannedProduct(null); }}
+                className="flex-1 py-2.5 rounded-xl bg-accent text-accent-foreground font-display font-semibold text-sm neon-glow-amber hover:opacity-90 transition-opacity"
+              >
+                В КОРЗИНУ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {orderMsg && (
         <div className={`mx-4 mt-4 px-4 py-3 rounded-xl text-sm ${orderMsg.startsWith("✅") ? "bg-primary/10 text-primary border border-primary/20" : "bg-destructive/10 text-destructive border border-destructive/20"} animate-fade-in`}>
           {orderMsg}
@@ -97,15 +152,24 @@ export default function ClientCatalog({ user, onUserUpdate }: Props) {
       )}
 
       <div className="px-4 pt-4 pb-3 space-y-3">
-        <div className="relative">
-          <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск товаров..."
-            className="w-full bg-secondary/50 border border-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-accent transition-colors"
-          />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск товаров..."
+              className="w-full bg-secondary/50 border border-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:border-accent transition-colors"
+            />
+          </div>
+          <button
+            onClick={() => setShowScanner(true)}
+            className="w-11 h-11 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent hover:bg-accent/25 transition-colors flex-shrink-0"
+            title="Сканировать штрихкод"
+          >
+            <Icon name="ScanLine" size={18} />
+          </button>
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
